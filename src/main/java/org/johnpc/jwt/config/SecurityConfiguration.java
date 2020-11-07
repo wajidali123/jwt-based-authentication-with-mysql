@@ -15,7 +15,6 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.AuthenticationEntryPoint;
 
 @Configuration
 @EnableWebSecurity
@@ -23,7 +22,6 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
 
     private UserPrincipleDetailService userPrincipleDetailService;
     private UserRepository userRepository;
-    private AuthenticationEntryPoint authenticationEntryPoint;
 
     public SecurityConfiguration(UserPrincipleDetailService userPrincipleDetailService, UserRepository userRepository) {
         this.userPrincipleDetailService = userPrincipleDetailService;
@@ -43,7 +41,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 .and()
                 // add jwt filters (1. authentication, 2. authorization)
                 .addFilter(new JwtAuthenticationFilter(authenticationManager()))
-                .addFilter(new JwtAuthorizationFilter(authenticationManager(), this.authenticationEntryPoint, this.userRepository))
+                .addFilter(new JwtAuthorizationFilter(authenticationManager(), this.userRepository))
                 .authorizeRequests()
                 // configure access rules
                 .antMatchers(HttpMethod.POST, "/login").permitAll()
