@@ -1,25 +1,33 @@
 package org.johnpc.jwt.config;
 
 import org.johnpc.jwt.UserPrincipleDetailService;
+import org.johnpc.jwt.jwtconfig.JwtAuthenticationFilter;
+import org.johnpc.jwt.jwtconfig.JwtAuthorizationFilter;
+import org.johnpc.jwt.repo.UserRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.AuthenticationEntryPoint;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
 
     private UserPrincipleDetailService userPrincipleDetailService;
+    private UserRepository userRepository;
+    private AuthenticationEntryPoint authenticationEntryPoint;
 
-    public SecurityConfiguration(UserPrincipleDetailService userPrincipleDetailService) {
+    public SecurityConfiguration(UserPrincipleDetailService userPrincipleDetailService, UserRepository userRepository) {
         this.userPrincipleDetailService = userPrincipleDetailService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -30,27 +38,18 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
+                .csrf().disable()
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                // add jwt filters (1. authentication, 2. authorization)
+                .addFilter(new JwtAuthenticationFilter(authenticationManager()))
+                .addFilter(new JwtAuthorizationFilter(authenticationManager(), this.authenticationEntryPoint, this.userRepository))
                 .authorizeRequests()
-                .antMatchers("index.html").permitAll()
-                /*Instead of giving specific route we can use wildcard (**) to match routes.*/
-                .antMatchers("/profile/**").authenticated()
-                .antMatchers("/admin/**").hasRole("ADMIN")
-                .antMatchers("/management/**").hasAnyRole("MANAGER","ADMIN")
-                .antMatchers("/api/public/test1").hasAuthority("ACCESS_TEST1")
-                .antMatchers("/api/public/test2").hasAuthority("ACCESS_TEST2")
-                .antMatchers("/api/public/test2").hasAuthority("ACCESS_TEST2")
-                .antMatchers("/api/public/users").hasRole("ADMIN")
-                .and()
-                .formLogin()
-                .loginProcessingUrl("/signin")
-                .loginPage("/login").defaultSuccessUrl("/index").permitAll()
-                .usernameParameter("txtUsername")
-                .passwordParameter("txtPassword")
-                .and()
-                .logout().logoutRequestMatcher(new AntPathRequestMatcher("/logout")).logoutSuccessUrl("/login")
-                .and()
-                .rememberMe().tokenValiditySeconds(5).key("Secret!")
-                .rememberMeParameter("checkRememberMe");
+                // configure access rules
+                .antMatchers(HttpMethod.POST, "/login").permitAll()
+                .antMatchers("/api/public/management/*").hasRole("MANAGER")
+                .antMatchers("/api/public/admin/*").hasRole("ADMIN")
+                .anyRequest().authenticated();
 
     }
 
